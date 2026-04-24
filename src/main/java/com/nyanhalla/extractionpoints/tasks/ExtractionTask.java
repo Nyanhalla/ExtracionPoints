@@ -20,6 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Tarea periódica que verifica el progreso de extracción de los jugadores.
  * Se ejecuta cada segundo (20 ticks).
  * Soporta display modes: actionbar, bossbar, title, none.
+ * También actualiza el TextDisplay entity del punto con el tiempo restante.
  */
 public class ExtractionTask extends BukkitRunnable {
 
@@ -78,6 +79,9 @@ public class ExtractionTask extends BukkitRunnable {
                 int remaining = extractionTime - elapsedSeconds;
                 String displayMode = wcfg.getDisplayMode();
                 showProgress(player, uuid, wcfg, remaining, extractionTime, elapsedSeconds);
+
+                // Update TextDisplay on the extraction point
+                point.updateTextDisplay(remaining, extractionTime, wcfg);
             }
         }
     }

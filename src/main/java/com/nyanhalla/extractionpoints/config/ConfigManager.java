@@ -102,9 +102,31 @@ public class ConfigManager {
         wcfg.setDisplayMode("actionbar");
         wcfg.setBossbarColor("GREEN");
         wcfg.setBossbarStyle("SEGMENTED_10");
-        wcfg.setBossbarTitle("&aExtrayendo &e{remaining}s &arestantes");
+        wcfg.setBossbarTitle("&aExtrayendo &e{remaining}s &arestates");
         wcfg.setPlayerCooldown(0);
         wcfg.setUsePermission("");
+        // Beacon defaults
+        wcfg.setBeaconEnabled(true);
+        wcfg.setBeaconBaseMaterial("IRON_BLOCK");
+        wcfg.setBeaconPlaceBeacon(true);
+        wcfg.setBeaconRestoreBlocks(true);
+        // Display entity defaults
+        wcfg.setDisplayEntityEnabled(true);
+        wcfg.setDisplayEntityHeightAbove(3.0);
+        wcfg.setDisplayEntityUpdateInterval(20);
+        wcfg.setDisplayEntityIdleText("&b⚔ Punto de Extracción");
+        wcfg.setDisplayEntityProgressGreen("&a⏳ {remaining}s");
+        wcfg.setDisplayEntityProgressYellow("&e⏳ {remaining}s");
+        wcfg.setDisplayEntityProgressRed("&c⏳ {remaining}s");
+        wcfg.setDisplayEntityYellowThreshold(0.6);
+        wcfg.setDisplayEntityRedThreshold(0.3);
+        wcfg.setDisplayEntityBackgroundColor("BLACK@0.5");
+        wcfg.setDisplayEntitySeeThrough(false);
+        // Ambient sound defaults
+        wcfg.setAmbientSound("BLOCK_BEACON_AMBIENT");
+        wcfg.setAmbientSoundInterval(40);
+        wcfg.setAmbientSoundVolume(0.3f);
+        wcfg.setAmbientSoundPitch(1.0f);
     }
 
     private void applySection(WorldConfig wcfg, ConfigurationSection sec) {
@@ -137,6 +159,35 @@ public class ConfigManager {
             wcfg.setMessages(messages);
         }
 
+        // Beacon
+        ConfigurationSection beaconSec = sec.getConfigurationSection("beacon");
+        if (beaconSec != null) {
+            if (beaconSec.contains("enabled")) wcfg.setBeaconEnabled(beaconSec.getBoolean("enabled"));
+            if (beaconSec.contains("base-material")) wcfg.setBeaconBaseMaterial(beaconSec.getString("base-material"));
+            if (beaconSec.contains("place-beacon")) wcfg.setBeaconPlaceBeacon(beaconSec.getBoolean("place-beacon"));
+            if (beaconSec.contains("restore-blocks")) wcfg.setBeaconRestoreBlocks(beaconSec.getBoolean("restore-blocks"));
+        }
+
+        // Display entity
+        ConfigurationSection displayEntitySec = sec.getConfigurationSection("display-entity");
+        if (displayEntitySec != null) {
+            if (displayEntitySec.contains("enabled")) wcfg.setDisplayEntityEnabled(displayEntitySec.getBoolean("enabled"));
+            if (displayEntitySec.contains("height-above")) wcfg.setDisplayEntityHeightAbove(displayEntitySec.getDouble("height-above"));
+            if (displayEntitySec.contains("update-interval")) wcfg.setDisplayEntityUpdateInterval(displayEntitySec.getInt("update-interval"));
+            if (displayEntitySec.contains("idle-text")) wcfg.setDisplayEntityIdleText(displayEntitySec.getString("idle-text"));
+            if (displayEntitySec.contains("see-through")) wcfg.setDisplayEntitySeeThrough(displayEntitySec.getBoolean("see-through"));
+            if (displayEntitySec.contains("background-color")) wcfg.setDisplayEntityBackgroundColor(displayEntitySec.getString("background-color"));
+
+            ConfigurationSection fmtSec = displayEntitySec.getConfigurationSection("extracting-format");
+            if (fmtSec != null) {
+                if (fmtSec.contains("progress-green")) wcfg.setDisplayEntityProgressGreen(fmtSec.getString("progress-green"));
+                if (fmtSec.contains("progress-yellow")) wcfg.setDisplayEntityProgressYellow(fmtSec.getString("progress-yellow"));
+                if (fmtSec.contains("progress-red")) wcfg.setDisplayEntityProgressRed(fmtSec.getString("progress-red"));
+                if (fmtSec.contains("yellow-threshold")) wcfg.setDisplayEntityYellowThreshold(fmtSec.getDouble("yellow-threshold"));
+                if (fmtSec.contains("red-threshold")) wcfg.setDisplayEntityRedThreshold(fmtSec.getDouble("red-threshold"));
+            }
+        }
+
         // Effects
         ConfigurationSection effectsSec = sec.getConfigurationSection("effects");
         if (effectsSec != null) {
@@ -157,6 +208,11 @@ public class ConfigManager {
             if (effectsSec.contains("cancel-sound")) wcfg.setCancelSound(effectsSec.getString("cancel-sound"));
             if (effectsSec.contains("cancel-sound-volume")) wcfg.setCancelSoundVolume((float) effectsSec.getDouble("cancel-sound-volume"));
             if (effectsSec.contains("cancel-sound-pitch")) wcfg.setCancelSoundPitch((float) effectsSec.getDouble("cancel-sound-pitch"));
+            // Ambient sound
+            if (effectsSec.contains("ambient-sound")) wcfg.setAmbientSound(effectsSec.getString("ambient-sound"));
+            if (effectsSec.contains("ambient-sound-interval")) wcfg.setAmbientSoundInterval(effectsSec.getInt("ambient-sound-interval"));
+            if (effectsSec.contains("ambient-sound-volume")) wcfg.setAmbientSoundVolume((float) effectsSec.getDouble("ambient-sound-volume"));
+            if (effectsSec.contains("ambient-sound-pitch")) wcfg.setAmbientSoundPitch((float) effectsSec.getDouble("ambient-sound-pitch"));
         }
 
         // Display

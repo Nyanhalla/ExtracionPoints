@@ -55,7 +55,41 @@ global:
     not-in-area: "&cNo estás en un punto de extracción"
     point-approaching: "&ePunto de extracción cerca — &f{distance} bloques"
   
-  # Visual effects
+  # Real beacon beam visual
+  beacon:
+    # Enable placing a real beacon block + mineral base pyramid
+    enabled: true
+    # Material for the base pyramid (IRON_BLOCK, GOLD_BLOCK, DIAMOND_BLOCK, EMERALD_BLOCK)
+    base-material: "IRON_BLOCK"
+    # Place a beacon block at the point location
+    place-beacon: true
+    # Clean up (restore original blocks) when point is removed
+    restore-blocks: true
+  
+  # Floating text display entity above the beacon
+  display-entity:
+    # Enable the floating TextDisplay entity
+    enabled: true
+    # Height above the beacon block
+    height-above: 3.0
+    # Update interval in ticks (20 = 1 second)
+    update-interval: 20
+    # Idle text when no one is extracting (empty = no text when idle)
+    idle-text: "&b⚔ Punto de Extracción"
+    # Formatting per state
+    extracting-format:
+      # Colors cycle through: green → yellow → red as time runs out
+      progress-green: "&a⏳ {remaining}s"
+      progress-yellow: "&e⏳ {remaining}s"
+      progress-red: "&c⏳ {remaining}s"
+      # Thresholds (percentage of extraction-time remaining)
+      yellow-threshold: 0.6
+      red-threshold: 0.3
+    # TextDisplay properties
+    background-color: "BLACK@0.5"
+    see-through: false
+  
+  # Visual effects (particles)
   effects:
     beam-particle: "END_ROD"
     beam-particle-count: 1
@@ -77,6 +111,11 @@ global:
     cancel-sound: "ENTITY_ITEM_BREAK"
     cancel-sound-volume: 0.5
     cancel-sound-pitch: 1.0
+    # Ambient sound played to nearby players periodically
+    ambient-sound: "BLOCK_BEACON_AMBIENT"
+    ambient-sound-interval: 40
+    ambient-sound-volume: 0.3
+    ambient-sound-pitch: 1.0
   
   # Bossbar / ActionBar display during extraction
   display:

@@ -3,6 +3,7 @@ package com.nyanhalla.extractionpoints.managers;
 import com.nyanhalla.extractionpoints.ExtractionPoints;
 import com.nyanhalla.extractionpoints.config.WorldConfig;
 import com.nyanhalla.extractionpoints.models.ExtractionPoint;
+import com.nyanhalla.extractionpoints.tasks.ParticleTask;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -90,6 +91,11 @@ public class PointManager {
 
             ExtractionPoint point = new ExtractionPoint(loc, wcfg.getPointRadius());
             activePoints.add(point);
+
+            // Place beacon + text display
+            point.placeBeacon(wcfg);
+            point.createTextDisplay(wcfg);
+
             return point;
         }
 
@@ -199,18 +205,23 @@ public class PointManager {
      */
     public void cancelExtraction(Player player) {
         UUID uuid = player.getUniqueId();
-        if (extractingPlayers.containsKey(uuid)) {
-            extractingPlayers.remove(uuid);
-            extractionStartTimes.remove(uuid);
+        ExtractionPoint point = extractingPlayers.get(uuid);
+        extractingPlayers.remove(uuid);
+        extractionStartTimes.remove(uuid);
 
+        if (point != null) {
+            // Reset text display to idle
             WorldConfig wcfg = plugin.getConfigManager().getWorldConfig(player.getWorld().getName());
-            String msg = wcfg.getMessage("extraction-cancelled");
-            player.sendMessage(net.kyori.adventure.text.Component.text(
-                    org.bukkit.ChatColor.translateAlternateColorCodes('&', msg)));
-
-            // Play cancel sound
-            playSound(player, wcfg.getCancelSound(), wcfg.getCancelSoundVolume(), wcfg.getCancelSoundPitch());
+            point.resetTextDisplay(wcfg);
         }
+
+        WorldConfig wcfg = plugin.getConfigManager().getWorldConfig(player.getWorld().getName());
+        String msg = wcfg.getMessage("extraction-cancelled");
+        player.sendMessage(net.kyori.adventure.text.Component.text(
+                org.bukkit.ChatColor.translateAlternateColorCodes('&', msg)));
+
+        // Play cancel sound
+        playSound(player, wcfg.getCancelSound(), wcfg.getCancelSoundVolume(), wcfg.getCancelSoundPitch());
     }
 
     /**
@@ -241,6 +252,9 @@ public class PointManager {
         String msg = wcfg.getMessage("extraction-success");
         player.sendMessage(net.kyori.adventure.text.Component.text(
                 org.bukkit.ChatColor.translateAlternateColorCodes('&', msg)));
+
+        // Spawn completion particle effect
+        ParticleTask.spawnCompletionEffect(point.getLocation());
 
         // Remove point and spawn a new one in the same world
         removePoint(point);
@@ -296,7 +310,14 @@ public class PointManager {
      */
     public void removePoint(ExtractionPoint point) {
         point.setActive(false);
+
+        // Cleanup visual elements before removing
+        String worldName = point.getLocation().getWorld().getName();
+        WorldConfig wcfg = plugin.getConfigManager().getWorldConfig(worldName);
+        point.cleanup(wcfg);
+
         activePoints.remove(point);
+
         // Cancel any players extracting at this point
         Iterator<Map.Entry<UUID, ExtractionPoint>> it = extractingPlayers.entrySet().iterator();
         while (it.hasNext()) {
@@ -420,6 +441,12 @@ public class PointManager {
      * Limpia todos los puntos y datos de jugadores.
      */
     public void shutdown() {
+        // Cleanup all visual elements for active points
+        for (ExtractionPoint point : activePoints) {
+            String worldName = point.getLocation().getWorld().getName();
+            WorldConfig wcfg = plugin.getConfigManager().getWorldConfig(worldName);
+            point.cleanup(wcfg);
+        }
         activePoints.clear();
         extractingPlayers.clear();
         extractionStartTimes.clear();

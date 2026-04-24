@@ -47,6 +47,31 @@ public class WorldConfig {
     private int playerCooldown;
     private String usePermission;
 
+    // Beacon config
+    private boolean beaconEnabled;
+    private String beaconBaseMaterial;
+    private boolean beaconPlaceBeacon;
+    private boolean beaconRestoreBlocks;
+
+    // Display entity config
+    private boolean displayEntityEnabled;
+    private double displayEntityHeightAbove;
+    private int displayEntityUpdateInterval;
+    private String displayEntityIdleText;
+    private String displayEntityProgressGreen;
+    private String displayEntityProgressYellow;
+    private String displayEntityProgressRed;
+    private double displayEntityYellowThreshold;
+    private double displayEntityRedThreshold;
+    private String displayEntityBackgroundColor;
+    private boolean displayEntitySeeThrough;
+
+    // Ambient sound config
+    private String ambientSound;
+    private int ambientSoundInterval;
+    private float ambientSoundVolume;
+    private float ambientSoundPitch;
+
     public WorldConfig(String worldName) {
         this.worldName = worldName;
     }
@@ -166,6 +191,69 @@ public class WorldConfig {
 
     public String getUsePermission() { return usePermission; }
     public void setUsePermission(String usePermission) { this.usePermission = usePermission; }
+
+    // --- Beacon getters/setters ---
+
+    public boolean isBeaconEnabled() { return beaconEnabled; }
+    public void setBeaconEnabled(boolean beaconEnabled) { this.beaconEnabled = beaconEnabled; }
+
+    public String getBeaconBaseMaterial() { return beaconBaseMaterial; }
+    public void setBeaconBaseMaterial(String beaconBaseMaterial) { this.beaconBaseMaterial = beaconBaseMaterial; }
+
+    public boolean isBeaconPlaceBeacon() { return beaconPlaceBeacon; }
+    public void setBeaconPlaceBeacon(boolean beaconPlaceBeacon) { this.beaconPlaceBeacon = beaconPlaceBeacon; }
+
+    public boolean isBeaconRestoreBlocks() { return beaconRestoreBlocks; }
+    public void setBeaconRestoreBlocks(boolean beaconRestoreBlocks) { this.beaconRestoreBlocks = beaconRestoreBlocks; }
+
+    // --- Display Entity getters/setters ---
+
+    public boolean isDisplayEntityEnabled() { return displayEntityEnabled; }
+    public void setDisplayEntityEnabled(boolean displayEntityEnabled) { this.displayEntityEnabled = displayEntityEnabled; }
+
+    public double getDisplayEntityHeightAbove() { return displayEntityHeightAbove; }
+    public void setDisplayEntityHeightAbove(double displayEntityHeightAbove) { this.displayEntityHeightAbove = displayEntityHeightAbove; }
+
+    public int getDisplayEntityUpdateInterval() { return displayEntityUpdateInterval; }
+    public void setDisplayEntityUpdateInterval(int displayEntityUpdateInterval) { this.displayEntityUpdateInterval = displayEntityUpdateInterval; }
+
+    public String getDisplayEntityIdleText() { return displayEntityIdleText; }
+    public void setDisplayEntityIdleText(String displayEntityIdleText) { this.displayEntityIdleText = displayEntityIdleText; }
+
+    public String getDisplayEntityProgressGreen() { return displayEntityProgressGreen; }
+    public void setDisplayEntityProgressGreen(String displayEntityProgressGreen) { this.displayEntityProgressGreen = displayEntityProgressGreen; }
+
+    public String getDisplayEntityProgressYellow() { return displayEntityProgressYellow; }
+    public void setDisplayEntityProgressYellow(String displayEntityProgressYellow) { this.displayEntityProgressYellow = displayEntityProgressYellow; }
+
+    public String getDisplayEntityProgressRed() { return displayEntityProgressRed; }
+    public void setDisplayEntityProgressRed(String displayEntityProgressRed) { this.displayEntityProgressRed = displayEntityProgressRed; }
+
+    public double getDisplayEntityYellowThreshold() { return displayEntityYellowThreshold; }
+    public void setDisplayEntityYellowThreshold(double displayEntityYellowThreshold) { this.displayEntityYellowThreshold = displayEntityYellowThreshold; }
+
+    public double getDisplayEntityRedThreshold() { return displayEntityRedThreshold; }
+    public void setDisplayEntityRedThreshold(double displayEntityRedThreshold) { this.displayEntityRedThreshold = displayEntityRedThreshold; }
+
+    public String getDisplayEntityBackgroundColor() { return displayEntityBackgroundColor; }
+    public void setDisplayEntityBackgroundColor(String displayEntityBackgroundColor) { this.displayEntityBackgroundColor = displayEntityBackgroundColor; }
+
+    public boolean isDisplayEntitySeeThrough() { return displayEntitySeeThrough; }
+    public void setDisplayEntitySeeThrough(boolean displayEntitySeeThrough) { this.displayEntitySeeThrough = displayEntitySeeThrough; }
+
+    // --- Ambient sound getters/setters ---
+
+    public String getAmbientSound() { return ambientSound; }
+    public void setAmbientSound(String ambientSound) { this.ambientSound = ambientSound; }
+
+    public int getAmbientSoundInterval() { return ambientSoundInterval; }
+    public void setAmbientSoundInterval(int ambientSoundInterval) { this.ambientSoundInterval = ambientSoundInterval; }
+
+    public float getAmbientSoundVolume() { return ambientSoundVolume; }
+    public void setAmbientSoundVolume(float ambientSoundVolume) { this.ambientSoundVolume = ambientSoundVolume; }
+
+    public float getAmbientSoundPitch() { return ambientSoundPitch; }
+    public void setAmbientSoundPitch(float ambientSoundPitch) { this.ambientSoundPitch = ambientSoundPitch; }
 
     /**
      * Entrada de comando configurable.
