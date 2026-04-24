@@ -1,0 +1,17 @@
+name: ExtractionPoints
+version: '${project.version}'
+main: com.nyanhalla.extractionpoints.ExtractionPoints
+api-version: '1.21'
+prefix: ExtractionPoints
+description: Sistema de puntos de extracción para server PVP
+authors: [Nyanhalla]
+commands:
+  extractionpoints:
+    description: Comando admin para puntos de extracción
+    usage: /extractionpoints <reload|list|spawn|remove>
+    aliases: [ep]
+    permission: extractionpoints.admin
+permissions:
+  extractionpoints.admin:
+    description: Permite usar comandos admin de ExtractionPoints
+    default: op
