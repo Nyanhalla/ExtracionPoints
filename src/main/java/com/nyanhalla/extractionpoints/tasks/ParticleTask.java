@@ -1,15 +1,16 @@
 package com.nyanhalla.extractionpoints.tasks;
 
 import com.nyanhalla.extractionpoints.ExtractionPoints;
-import com.nyanhalla.extractionpoints.config.ConfigManager;
+import com.nyanhalla.extractionpoints.config.WorldConfig;
 import com.nyanhalla.extractionpoints.models.ExtractionPoint;
 import org.bukkit.Location;
 import org.bukkit.Particle;
+import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 
 /**
  * Tarea periódica que dibuja las partículas de los puntos de extracción.
- * Se ejecuta cada 10 ticks (0.5 segundos).
+ * Itera puntos de todos los mundos y solo renderiza si hay jugadores cerca.
  */
 public class ParticleTask extends BukkitRunnable {
 
@@ -21,36 +22,55 @@ public class ParticleTask extends BukkitRunnable {
 
     @Override
     public void run() {
-        ConfigManager cfg = plugin.getConfigManager();
-
-        Particle beamParticle;
-        Particle circleParticle;
-        try {
-            beamParticle = Particle.valueOf(cfg.getBeamParticle());
-        } catch (IllegalArgumentException e) {
-            beamParticle = Particle.END_ROD;
-        }
-        try {
-            circleParticle = Particle.valueOf(cfg.getCircleParticle());
-        } catch (IllegalArgumentException e) {
-            circleParticle = Particle.FLAME;
-        }
-
-        int beamHeight = cfg.getBeamHeight();
-        int circleDensity = cfg.getCircleDensity();
-        double pointRadius = cfg.getPointRadius();
-
         for (ExtractionPoint point : plugin.getPointManager().getActivePoints()) {
             if (!point.isActive()) continue;
 
             Location loc = point.getLocation();
             if (loc.getWorld() == null) continue;
-            if (!loc.getWorld().getName().equals(cfg.getWorldName())) continue;
+
+            String worldName = loc.getWorld().getName();
+            WorldConfig wcfg = plugin.getConfigManager().getWorldConfig(worldName);
+            if (!wcfg.isEnabled()) continue;
+
+            // Optimization: only render particles if there are players nearby
+            int renderDistance = wcfg.getParticleRenderDistance();
+            double renderDistSq = (double) renderDistance * renderDistance;
+            boolean hasNearbyPlayer = false;
+
+            for (Player player : loc.getWorld().getPlayers()) {
+                if (player.getLocation().distanceSquared(loc) <= renderDistSq) {
+                    hasNearbyPlayer = true;
+                    break;
+                }
+            }
+
+            if (!hasNearbyPlayer) continue;
+
+            // Resolve particles
+            Particle beamParticle;
+            Particle circleParticle;
+            try {
+                beamParticle = Particle.valueOf(wcfg.getBeamParticle());
+            } catch (IllegalArgumentException e) {
+                beamParticle = Particle.END_ROD;
+            }
+            try {
+                circleParticle = Particle.valueOf(wcfg.getCircleParticle());
+            } catch (IllegalArgumentException e) {
+                circleParticle = Particle.FLAME;
+            }
+
+            int beamHeight = wcfg.getBeamHeight();
+            int beamSpacing = Math.max(1, wcfg.getBeamSpacing());
+            int beamCount = wcfg.getBeamParticleCount();
+            int circleDensity = wcfg.getCircleDensity();
+            int circleCount = wcfg.getCircleParticleCount();
+            double pointRadius = wcfg.getPointRadius();
 
             // Draw vertical beam
-            for (int y = 0; y <= beamHeight; y += 2) {
+            for (int y = 0; y <= beamHeight; y += beamSpacing) {
                 Location beamLoc = loc.clone().add(0, y, 0);
-                loc.getWorld().spawnParticle(beamParticle, beamLoc, 1, 0.0, 0.0, 0.0, 0.0);
+                loc.getWorld().spawnParticle(beamParticle, beamLoc, beamCount, 0.0, 0.0, 0.0, 0.0);
             }
 
             // Draw circle on ground
@@ -59,7 +79,7 @@ public class ParticleTask extends BukkitRunnable {
                 double x = loc.getX() + pointRadius * Math.cos(angle);
                 double z = loc.getZ() + pointRadius * Math.sin(angle);
                 Location circleLoc = new Location(loc.getWorld(), x, loc.getY() + 0.1, z);
-                loc.getWorld().spawnParticle(circleParticle, circleLoc, 1, 0.0, 0.0, 0.0, 0.0);
+                loc.getWorld().spawnParticle(circleParticle, circleLoc, circleCount, 0.0, 0.0, 0.0, 0.0);
             }
         }
     }

@@ -1,58 +1,138 @@
-extraction-points:
-  # Mundo donde aparecen los puntos
-  world: "server"
+# ===========================================================
+# ExtractionPoints - Configuration
+# ===========================================================
+
+# Global defaults (used when a world doesn't have specific overrides)
+global:
+  # Enable extraction points in worlds by default?
+  enabled: false
   
-  # Radio desde el spawn del mundo para generar puntos aleatorios
+  # Use the world's border (WorldBorder API) to determine spawn area
+  # When true: points spawn within the world border bounds
+  # When false: uses spawn-center + spawn-radius
+  use-world-border: true
+  
+  # Center point when NOT using world border
+  # "spawn" = world spawn point, or specify coordinates
+  spawn-center: "spawn"
+  # spawn-center: "0,0"  # alternative: specific coords
+  
+  # Radius from spawn-center when NOT using world border
   spawn-radius: 500
   
-  # Radio del área del círculo de extracción (en bloques)
-  point-radius: 5
+  # Radius of the extraction circle (blocks)
+  point-radius: 5.0
   
-  # Tiempo necesario dentro del área para extraerse (segundos)
+  # Seconds a player must stay inside the circle
   extraction-time: 20
   
-  # Cantidad de puntos activos simultáneamente
+  # How many extraction points per world
   max-points: 3
   
-  # Intervalo de regeneración de puntos (segundos). Cuando un punto se usa, aparece uno nuevo.
-  # También checkea periódicamente y reposiciona puntos si hace falta
-  respawn-interval: 60
-  
-  # Y mínimo y máximo para generar puntos
+  # Y bounds for point generation
   min-y: 60
   max-y: 120
   
-  # Comandos ejecutados al extraerse (desde consola por defecto)
+  # Margin to keep away from world border edge (blocks)
+  border-margin: 10
+  
+  # Whether points can be in the same chunk/area or need minimum distance
+  min-distance-between-points: 50
+  
+  # Commands executed when extraction completes
   # Placeholders: {player}, {x}, {y}, {z}, {world}, {point-x}, {point-y}, {point-z}
   commands:
     - command: "home {player}"
       as-console: true
       delay-ticks: 0
   
-  # Mensajes (soporta color codes con &)
+  # Messages (supports & color codes)
   messages:
     extraction-start: "&a&lEXTRACCIÓN &eQuédate en el área {time} segundos para extraerte!"
     extraction-progress: "&eExtrayendo... &f{remaining} segundos restantes"
     extraction-success: "&a&lEXTRACCIÓN COMPLETA &e¡Volviendo a tu isla!"
     extraction-cancelled: "&cExtracción cancelada — saliste del área"
     not-in-area: "&cNo estás en un punto de extracción"
-    
-  # Efectos visuales
+    point-approaching: "&ePunto de extracción cerca — &f{distance} bloques"
+  
+  # Visual effects
   effects:
     beam-particle: "END_ROD"
-    circle-particle: "FLAME"
+    beam-particle-count: 1
     beam-height: 30
+    beam-spacing: 2
+    circle-particle: "FLAME"
+    circle-particle-count: 1
     circle-density: 20
+    # Particle visibility range (blocks)
+    particle-render-distance: 64
     extraction-sound: "ENTITY_ENDERMAN_TELEPORT"
     extraction-sound-volume: 1.0
     extraction-sound-pitch: 1.0
+    # Sound played when starting extraction
+    start-sound: "BLOCK_NOTE_BLOCK_PLING"
+    start-sound-volume: 1.0
+    start-sound-pitch: 1.5
+    # Sound played when cancelled
+    cancel-sound: "ENTITY_ITEM_BREAK"
+    cancel-sound-volume: 0.5
+    cancel-sound-pitch: 1.0
+  
+  # Bossbar / ActionBar display during extraction
+  display:
+    # "actionbar", "bossbar", "title", "none"
+    mode: "actionbar"
+    # Bossbar color (only if mode=bossbar): PINK, BLUE, RED, GREEN, YELLOW, PURPLE, WHITE
+    bossbar-color: "GREEN"
+    # Bossbar style: SOLID, SEGMENTED_6, SEGMENTED_10, SEGMENTED_12, SEGMENTED_20
+    bossbar-style: "SEGMENTED_10"
+    # Bossbar title (placeholders: {remaining}, {time}, {max})
+    bossbar-title: "&aExtrayendo &e{remaining}s &arestantes"
+  
+  # Cooldown between extractions for the same player (seconds, 0 = no cooldown)
+  player-cooldown: 0
+  
+  # Permission required to use extraction points (empty = no permission needed)
+  use-permission: ""
 
-# Comando admin /extractionpoints (alias: /ep)
+# ===========================================================
+# Per-world overrides
+# Worlds not listed here use global defaults.
+# ===========================================================
+worlds:
+  server:
+    enabled: true
+    use-world-border: true
+    max-points: 3
+    extraction-time: 20
+    commands:
+      - command: "home {player}"
+        as-console: true
+        delay-ticks: 0
+  # island:
+  #   enabled: false  # no extraction points in island world
+  # dungeon:
+  #   enabled: true
+  #   extraction-time: 30
+  #   commands:
+  #     - command: "mvtp {player} server"
+  #       as-console: true
+
+# ===========================================================
+# Admin settings
+# ===========================================================
 admin:
   messages:
     reload: "&a[ExtractionPoints] Configuración recargada."
     no-permission: "&cNo tienes permiso."
-    usage: "&e/extractionpoints <reload|list|spawn|remove>"
-    point-spawned: "&aPunto de extracción generado en &e{x} {y} {z}"
+    usage: "&e/extractionpoints <reload|list|spawn|remove|worlds>"
+    point-spawned: "&aPunto de extracción generado en &e{x} {y} {z} &a({world})"
     point-removed: "&aPunto de extracción eliminado."
-    points-list: "&ePuntos activos: &f{count}"
+    points-list: "&ePuntos activos ({world}): &f{count}"
+    points-list-entry: "&7#{index}: &f{x}, {y}, {z}"
+    no-points: "&eNo hay puntos activos."
+    worlds-list: "&eMundos con extracción: &f{worlds}"
+    world-not-found: "&cMundo '&f{world}&c' no encontrado."
+    spawn-usage: "&e/ep spawn [world]"
+    remove-usage: "&e/ep remove [world]"
+    cooldown-set: "&aCooldown de extracción establecido para &e{player}"

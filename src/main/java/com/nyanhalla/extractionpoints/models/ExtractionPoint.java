@@ -46,6 +46,16 @@ public class ExtractionPoint {
         return (dx * dx + dz * dz) <= (radius * radius);
     }
 
+    /**
+     * Distancia horizontal (2D) a una location.
+     */
+    public double distance2D(Location loc) {
+        if (!loc.getWorld().equals(location.getWorld())) return Double.MAX_VALUE;
+        double dx = loc.getX() - location.getX();
+        double dz = loc.getZ() - location.getZ();
+        return Math.sqrt(dx * dx + dz * dz);
+    }
+
     @Override
     public String toString() {
         return String.format("ExtractionPoint{world=%s, x=%.1f, y=%.1f, z=%.1f, r=%.1f, active=%s}",

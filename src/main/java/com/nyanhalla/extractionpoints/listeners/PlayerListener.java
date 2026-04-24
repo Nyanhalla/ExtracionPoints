@@ -1,10 +1,9 @@
 package com.nyanhalla.extractionpoints.listeners;
 
 import com.nyanhalla.extractionpoints.ExtractionPoints;
-import com.nyanhalla.extractionpoints.config.ConfigManager;
+import com.nyanhalla.extractionpoints.config.WorldConfig;
 import com.nyanhalla.extractionpoints.managers.PointManager;
 import com.nyanhalla.extractionpoints.models.ExtractionPoint;
-import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -35,34 +34,46 @@ public class PlayerListener implements Listener {
         }
 
         Player player = event.getPlayer();
-        ConfigManager cfg = plugin.getConfigManager();
+        String worldName = player.getWorld().getName();
+        WorldConfig wcfg = plugin.getConfigManager().getWorldConfig(worldName);
 
-        // Solo funciona en el mundo configurado
-        if (!player.getWorld().getName().equals(cfg.getWorldName())) {
+        // Check if extraction is enabled in this world
+        if (!wcfg.isEnabled()) {
+            return;
+        }
+
+        // Check permission
+        String perm = wcfg.getUsePermission();
+        if (perm != null && !perm.isEmpty() && !player.hasPermission(perm)) {
             return;
         }
 
         PointManager pointManager = plugin.getPointManager();
         UUID uuid = player.getUniqueId();
 
-        // Si ya está en proceso de extracción, no hacer nada (lo maneja ExtractionTask)
+        // If already extracting, let ExtractionTask handle it
         if (pointManager.isExtracting(uuid)) {
             return;
         }
 
-        // Verificar si está en un punto de extracción
+        // Check cooldown
+        if (wcfg.getPlayerCooldown() > 0) {
+            // Cooldown is checked in startExtraction, but we can early-return here too
+        }
+
+        // Check if player is in an extraction point
         ExtractionPoint point = pointManager.getPointAt(player.getLocation());
         if (point == null) {
             return;
         }
 
-        // Iniciar extracción
+        // Start extraction
         pointManager.startExtraction(player, point);
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerMove(PlayerMoveEvent event) {
-        // Solo checkear si cambió posición significativamente (no solo cabeza)
+        // Only check if position changed significantly (not just head movement)
         if (event.getFrom().getBlockX() == event.getTo().getBlockX()
                 && event.getFrom().getBlockZ() == event.getTo().getBlockZ()) {
             return;
@@ -76,7 +87,7 @@ public class PlayerListener implements Listener {
             return;
         }
 
-        // Verificar si sigue en el punto
+        // Check if player is still in the extraction point
         ExtractionPoint point = pointManager.getExtractionPoint(uuid);
         if (point == null) return;
 

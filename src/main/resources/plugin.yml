@@ -3,12 +3,13 @@ version: '${project.version}'
 main: com.nyanhalla.extractionpoints.ExtractionPoints
 api-version: '1.21'
 prefix: ExtractionPoints
-description: Sistema de puntos de extracción para server PVP
+description: Sistema de puntos de extracción para server PVP con islas skyblock
 authors: [Nyanhalla]
+softdepend: [Multiverse-Core]
 commands:
   extractionpoints:
     description: Comando admin para puntos de extracción
-    usage: /extractionpoints <reload|list|spawn|remove>
+    usage: /extractionpoints <reload|list|spawn|remove|worlds>
     aliases: [ep]
     permission: extractionpoints.admin
 permissions:
