@@ -38,12 +38,26 @@ global:
   
   # Whether points can be in the same chunk/area or need minimum distance
   min-distance-between-points: 50
+
+  # ----- Lifecycle / replay -----
+  # When false: el punto NO se elimina al completarse una extracción.
+  #   Sólo entra en cooldown durante point-cooldown segundos y luego vuelve a
+  #   estar disponible. Ideal para puntos persistentes en mapa.
+  # When true: el punto se elimina y se respawnea en otra ubicación aleatoria.
+  respawn-on-extraction: false
+
+  # Cooldown del punto tras una extracción exitosa (segundos).
+  # Sólo aplica si respawn-on-extraction es false.
+  point-cooldown: 60
   
   # Commands executed when extraction completes
   # Placeholders: {player}, {x}, {y}, {z}, {world}, {point-x}, {point-y}, {point-z}
+  # bypass-permissions: ejecuta el comando como el jugador pero saltándose las
+  # comprobaciones de permisos (op temporal durante la ejecución).
   commands:
-    - command: "home {player}"
-      as-console: true
+    - command: "island"
+      as-console: false
+      bypass-permissions: true
       delay-ticks: 0
   
   # Messages (supports & color codes)
@@ -51,9 +65,12 @@ global:
     extraction-start: "&a&lEXTRACCIÓN &eQuédate en el área {time} segundos para extraerte!"
     extraction-progress: "&eExtrayendo... &f{remaining} segundos restantes"
     extraction-success: "&a&lEXTRACCIÓN COMPLETA &e¡Volviendo a tu isla!"
+    extraction-success-title: "&a&l¡EXTRACCIÓN!"
+    extraction-success-subtitle: "&e¡Volviendo a tu isla!"
     extraction-cancelled: "&cExtracción cancelada — saliste del área"
     not-in-area: "&cNo estás en un punto de extracción"
     point-approaching: "&ePunto de extracción cerca — &f{distance} bloques"
+    point-on-cooldown: "&8❄ &7Este punto está enfriándose. Vuelve en &f{remaining}s"
   
   # Real beacon beam visual
   beacon:
@@ -65,6 +82,23 @@ global:
     place-beacon: true
     # Clean up (restore original blocks) when point is removed
     restore-blocks: true
+    # Color del beam del beacon: vacío para blanco, o un color de cristal tintado
+    # (RED, ORANGE, YELLOW, LIME, GREEN, CYAN, LIGHT_BLUE, BLUE, PURPLE, MAGENTA,
+    #  PINK, WHITE, LIGHT_GRAY, GRAY, BLACK, BROWN). Coloca un cristal sobre el beacon.
+    glass-color: "CYAN"
+    # Color del beam mientras se extrae (vacío = no cambiar)
+    glass-color-extracting: "YELLOW"
+    # Color del beam cuando el punto está en cooldown
+    glass-color-cooldown: "BLUE"
+    # ── Schematic (requiere WorldEdit/FAWE) ──
+    # Cuando true, usa un .schem de plugins/ExtractionPoints/schematics/
+    # en lugar de la estructura beacon vanilla.
+    # Workflow: construye la estructura en creative con el beacon donde quieras,
+    # ejecuta //copy con los pies encima del beacon, luego
+    #   //schem save extraction-point
+    # El schematic debe estar en plugins/ExtractionPoints/schematics/
+    use-schematic: false
+    schematic: "extraction-point"
   
   # Floating text display entity above the beacon
   display-entity:
@@ -75,7 +109,14 @@ global:
     # Update interval in ticks (20 = 1 second)
     update-interval: 20
     # Idle text when no one is extracting (empty = no text when idle)
-    idle-text: "&b⚔ Punto de Extracción"
+    idle-text: "&b&l⚔ Punto de Extracción ⚔"
+    # Texto cuando el punto está en cooldown ({remaining} = segundos restantes)
+    cooldown-text: "&8❄ &7Punto inactivo &8❄"
+    # Subtítulos (segunda línea) por estado. Compatible con DecentHolograms.
+    subtitle:
+      idle: "&7Click derecho para extraer"
+      extracting: "&e⏳ &7Mantente dentro del círculo"
+      cooldown: "&8Disponible en &f{remaining}s"
     # Formatting per state
     extracting-format:
       # Colors cycle through: green → yellow → red as time runs out
@@ -116,6 +157,21 @@ global:
     ambient-sound-interval: 40
     ambient-sound-volume: 0.3
     ambient-sound-pitch: 1.0
+
+    # ----- Capas de animación adicionales -----
+    # Doble anillo rotatorio + cruz cardinal en el suelo (estilo "rune circle")
+    runes: true
+    rune-particle: "SOUL_FIRE_FLAME"
+    # Arco que se va rellenando alrededor del círculo según el progreso de extracción
+    progress-ring: true
+    progress-ring-particle: "DUST"
+    # Partículas que convergen hacia el centro mientras alguien extrae
+    charging: true
+    charging-particle: "ENCHANT"
+    # Doble hélice contra-rotante mientras alguien extrae
+    double-helix: true
+    # Partícula usada cuando el punto está en cooldown
+    cooldown-particle: "SMOKE"
   
   # Bossbar / ActionBar display during extraction
   display:
@@ -145,8 +201,9 @@ worlds:
     max-points: 3
     extraction-time: 20
     commands:
-      - command: "home {player}"
-        as-console: true
+      - command: "island"
+        as-console: false
+        bypass-permissions: true
         delay-ticks: 0
   # island:
   #   enabled: false  # no extraction points in island world
@@ -164,7 +221,7 @@ admin:
   messages:
     reload: "&a[ExtractionPoints] Configuración recargada."
     no-permission: "&cNo tienes permiso."
-    usage: "&e/extractionpoints <reload|list|spawn|remove|worlds>"
+    usage: "&e/extractionpoints <reload|list|spawn|remove|worlds|info|tp>"
     point-spawned: "&aPunto de extracción generado en &e{x} {y} {z} &a({world})"
     point-removed: "&aPunto de extracción eliminado."
     points-list: "&ePuntos activos ({world}): &f{count}"
@@ -173,5 +230,9 @@ admin:
     worlds-list: "&eMundos con extracción: &f{worlds}"
     world-not-found: "&cMundo '&f{world}&c' no encontrado."
     spawn-usage: "&e/ep spawn [world]"
+    spawn-failed: "&cNo se pudo generar un punto en '&f{world}&c'. ¿Está cargado y tiene espacio válido?"
     remove-usage: "&e/ep remove [world]"
+    remove-not-found: "&cNo hay puntos de extracción en '&f{world}&c'."
+    remove-not-found-nearby: "&cNo hay puntos de extracción cerca."
+    point-teleported: "&aTeleportado al punto &e#{index}&a."
     cooldown-set: "&aCooldown de extracción establecido para &e{player}"

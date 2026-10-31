@@ -80,7 +80,7 @@ public class ConfigManager {
         wcfg.setMaxY(120);
         wcfg.setBorderMargin(10);
         wcfg.setMinDistanceBetweenPoints(50);
-        wcfg.setCommands(List.of(new WorldConfig.CommandEntry("home {player}", true, 0)));
+        wcfg.setCommands(List.of(new WorldConfig.CommandEntry("island", false, 0, true)));
         wcfg.setMessages(Map.of());
         wcfg.setBeamParticle("END_ROD");
         wcfg.setBeamParticleCount(1);
@@ -110,6 +110,23 @@ public class ConfigManager {
         wcfg.setBeaconBaseMaterial("IRON_BLOCK");
         wcfg.setBeaconPlaceBeacon(true);
         wcfg.setBeaconRestoreBlocks(true);
+        wcfg.setBeaconGlassColor("");
+        wcfg.setBeaconGlassColorExtracting("YELLOW");
+        wcfg.setBeaconGlassColorCooldown("BLUE");
+        wcfg.setUseSchematic(false);
+        wcfg.setSchematicName("extraction-point");
+        // Lifecycle
+        wcfg.setRespawnOnExtraction(false);
+        wcfg.setPointCooldown(60);
+        // Effects toggles
+        wcfg.setEffectRunes(true);
+        wcfg.setEffectProgressRing(true);
+        wcfg.setEffectCharging(true);
+        wcfg.setEffectDoubleHelix(true);
+        wcfg.setEffectCooldownParticle("SMOKE");
+        wcfg.setEffectChargingParticle("ENCHANT");
+        wcfg.setEffectProgressRingParticle("DUST");
+        wcfg.setEffectRuneParticle("SOUL_FIRE_FLAME");
         // Display entity defaults
         wcfg.setDisplayEntityEnabled(true);
         wcfg.setDisplayEntityHeightAbove(3.0);
@@ -122,6 +139,10 @@ public class ConfigManager {
         wcfg.setDisplayEntityRedThreshold(0.3);
         wcfg.setDisplayEntityBackgroundColor("BLACK@0.5");
         wcfg.setDisplayEntitySeeThrough(false);
+        wcfg.setDisplayEntityCooldownText("&8❄ &7Punto inactivo &8❄");
+        wcfg.setDisplayEntitySubtitleIdle("&7Click derecho para extraer");
+        wcfg.setDisplayEntitySubtitleExtracting("&7Mantente dentro del círculo");
+        wcfg.setDisplayEntitySubtitleCooldown("&8Disponible en &f{remaining}s");
         // Ambient sound defaults
         wcfg.setAmbientSound("BLOCK_BEACON_AMBIENT");
         wcfg.setAmbientSoundInterval(40);
@@ -143,6 +164,8 @@ public class ConfigManager {
         if (sec.contains("min-distance-between-points")) wcfg.setMinDistanceBetweenPoints(sec.getInt("min-distance-between-points"));
         if (sec.contains("player-cooldown")) wcfg.setPlayerCooldown(sec.getInt("player-cooldown"));
         if (sec.contains("use-permission")) wcfg.setUsePermission(sec.getString("use-permission", ""));
+        if (sec.contains("respawn-on-extraction")) wcfg.setRespawnOnExtraction(sec.getBoolean("respawn-on-extraction"));
+        if (sec.contains("point-cooldown")) wcfg.setPointCooldown(sec.getInt("point-cooldown"));
 
         // Commands
         if (sec.contains("commands")) {
@@ -166,6 +189,11 @@ public class ConfigManager {
             if (beaconSec.contains("base-material")) wcfg.setBeaconBaseMaterial(beaconSec.getString("base-material"));
             if (beaconSec.contains("place-beacon")) wcfg.setBeaconPlaceBeacon(beaconSec.getBoolean("place-beacon"));
             if (beaconSec.contains("restore-blocks")) wcfg.setBeaconRestoreBlocks(beaconSec.getBoolean("restore-blocks"));
+            if (beaconSec.contains("glass-color")) wcfg.setBeaconGlassColor(beaconSec.getString("glass-color", ""));
+            if (beaconSec.contains("glass-color-extracting")) wcfg.setBeaconGlassColorExtracting(beaconSec.getString("glass-color-extracting", "YELLOW"));
+            if (beaconSec.contains("glass-color-cooldown")) wcfg.setBeaconGlassColorCooldown(beaconSec.getString("glass-color-cooldown", "BLUE"));
+            if (beaconSec.contains("use-schematic")) wcfg.setUseSchematic(beaconSec.getBoolean("use-schematic"));
+            if (beaconSec.contains("schematic")) wcfg.setSchematicName(beaconSec.getString("schematic", "extraction-point"));
         }
 
         // Display entity
@@ -175,8 +203,16 @@ public class ConfigManager {
             if (displayEntitySec.contains("height-above")) wcfg.setDisplayEntityHeightAbove(displayEntitySec.getDouble("height-above"));
             if (displayEntitySec.contains("update-interval")) wcfg.setDisplayEntityUpdateInterval(displayEntitySec.getInt("update-interval"));
             if (displayEntitySec.contains("idle-text")) wcfg.setDisplayEntityIdleText(displayEntitySec.getString("idle-text"));
+            if (displayEntitySec.contains("cooldown-text")) wcfg.setDisplayEntityCooldownText(displayEntitySec.getString("cooldown-text"));
             if (displayEntitySec.contains("see-through")) wcfg.setDisplayEntitySeeThrough(displayEntitySec.getBoolean("see-through"));
             if (displayEntitySec.contains("background-color")) wcfg.setDisplayEntityBackgroundColor(displayEntitySec.getString("background-color"));
+
+            ConfigurationSection subSec = displayEntitySec.getConfigurationSection("subtitle");
+            if (subSec != null) {
+                if (subSec.contains("idle")) wcfg.setDisplayEntitySubtitleIdle(subSec.getString("idle"));
+                if (subSec.contains("extracting")) wcfg.setDisplayEntitySubtitleExtracting(subSec.getString("extracting"));
+                if (subSec.contains("cooldown")) wcfg.setDisplayEntitySubtitleCooldown(subSec.getString("cooldown"));
+            }
 
             ConfigurationSection fmtSec = displayEntitySec.getConfigurationSection("extracting-format");
             if (fmtSec != null) {
@@ -213,6 +249,15 @@ public class ConfigManager {
             if (effectsSec.contains("ambient-sound-interval")) wcfg.setAmbientSoundInterval(effectsSec.getInt("ambient-sound-interval"));
             if (effectsSec.contains("ambient-sound-volume")) wcfg.setAmbientSoundVolume((float) effectsSec.getDouble("ambient-sound-volume"));
             if (effectsSec.contains("ambient-sound-pitch")) wcfg.setAmbientSoundPitch((float) effectsSec.getDouble("ambient-sound-pitch"));
+            // Effects toggles + extra particle layers
+            if (effectsSec.contains("runes")) wcfg.setEffectRunes(effectsSec.getBoolean("runes"));
+            if (effectsSec.contains("progress-ring")) wcfg.setEffectProgressRing(effectsSec.getBoolean("progress-ring"));
+            if (effectsSec.contains("charging")) wcfg.setEffectCharging(effectsSec.getBoolean("charging"));
+            if (effectsSec.contains("double-helix")) wcfg.setEffectDoubleHelix(effectsSec.getBoolean("double-helix"));
+            if (effectsSec.contains("cooldown-particle")) wcfg.setEffectCooldownParticle(effectsSec.getString("cooldown-particle"));
+            if (effectsSec.contains("charging-particle")) wcfg.setEffectChargingParticle(effectsSec.getString("charging-particle"));
+            if (effectsSec.contains("progress-ring-particle")) wcfg.setEffectProgressRingParticle(effectsSec.getString("progress-ring-particle"));
+            if (effectsSec.contains("rune-particle")) wcfg.setEffectRuneParticle(effectsSec.getString("rune-particle"));
         }
 
         // Display
@@ -232,23 +277,25 @@ public class ConfigManager {
             for (Object obj : cmdList) {
                 if (obj instanceof ConfigurationSection sec) {
                     commands.add(new WorldConfig.CommandEntry(
-                            sec.getString("command", "home {player}"),
-                            sec.getBoolean("as-console", true),
-                            sec.getLong("delay-ticks", 0)
+                            sec.getString("command", "island"),
+                            sec.getBoolean("as-console", false),
+                            sec.getLong("delay-ticks", 0),
+                            sec.getBoolean("bypass-permissions", false)
                     ));
                 } else if (obj instanceof Map) {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> map = (Map<String, Object>) obj;
                     commands.add(new WorldConfig.CommandEntry(
-                            String.valueOf(map.getOrDefault("command", "home {player}")),
-                            Boolean.parseBoolean(String.valueOf(map.getOrDefault("as-console", true))),
-                            Long.parseLong(String.valueOf(map.getOrDefault("delay-ticks", 0)))
+                            String.valueOf(map.getOrDefault("command", "island")),
+                            Boolean.parseBoolean(String.valueOf(map.getOrDefault("as-console", false))),
+                            Long.parseLong(String.valueOf(map.getOrDefault("delay-ticks", 0))),
+                            Boolean.parseBoolean(String.valueOf(map.getOrDefault("bypass-permissions", false)))
                     ));
                 }
             }
         }
         if (commands.isEmpty()) {
-            commands.add(new WorldConfig.CommandEntry("home {player}", true, 0));
+            commands.add(new WorldConfig.CommandEntry("island", false, 0, true));
         }
         return commands;
     }

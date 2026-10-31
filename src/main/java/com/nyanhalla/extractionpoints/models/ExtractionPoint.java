@@ -1,40 +1,47 @@
 package com.nyanhalla.extractionpoints.models;
 
-import com.nyanhalla.extractionpoints.ExtractionPoints;
 import com.nyanhalla.extractionpoints.config.WorldConfig;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
-import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.Color;
+import com.nyanhalla.extractionpoints.services.HologramService;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
-import org.bukkit.entity.TextDisplay;
-import org.bukkit.entity.Display.Billboard;
-import org.bukkit.entity.TextDisplay.TextAlignment;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Representa un punto de extracción activo en el mundo.
  */
 public class ExtractionPoint {
 
+    public enum State { IDLE, EXTRACTING, COOLDOWN }
+
+    private final String id;
     private final Location location;
     private final double radius;
     private boolean active;
+    private State state = State.IDLE;
+    private long cooldownUntil = 0L;
+    private long extractionStartedAt = 0L;
+    private UUID initiator = null;
 
-    // Beacon & display visual data
+    // Beacon visual data
     private final Map<Location, Material> originalBlocks = new HashMap<>();
-    private TextDisplay textDisplay = null;
     private boolean beaconPlaced = false;
+    private boolean hologramCreated = false;
 
     public ExtractionPoint(Location location, double radius) {
+        this.id = "ep_" + UUID.randomUUID();
         this.location = location;
         this.radius = radius;
         this.active = true;
+    }
+
+    public String getId() {
+        return id;
     }
 
     public Location getLocation() {
@@ -53,12 +60,93 @@ public class ExtractionPoint {
         this.active = active;
     }
 
-    public boolean isBeaconPlaced() {
-        return beaconPlaced;
+    public boolean isBeaconPlaced() { return beaconPlaced; }
+    public void setBeaconPlaced(boolean beaconPlaced) { this.beaconPlaced = beaconPlaced; }
+
+    /**
+     * Estado actual sin efectos secundarios. La expiración del cooldown debe
+     * gestionarse llamando a {@link #tickCooldown()} desde el scheduler.
+     */
+    public State getState() {
+        return state;
     }
 
-    public TextDisplay getTextDisplay() {
-        return textDisplay;
+    public void setState(State newState) {
+        this.state = newState;
+    }
+
+    /**
+     * Pone el punto en cooldown durante {@code seconds} segundos.
+     */
+    public void enterCooldown(int seconds) {
+        this.state = State.COOLDOWN;
+        this.cooldownUntil = System.currentTimeMillis() + (seconds * 1000L);
+        this.extractionStartedAt = 0L;
+        this.initiator = null;
+    }
+
+    /**
+     * Inicia el temporizador de extracción del punto y lo pone EXTRACTING.
+     */
+    public void beginExtraction(UUID initiator) {
+        this.state = State.EXTRACTING;
+        this.extractionStartedAt = System.currentTimeMillis();
+        this.initiator = initiator;
+    }
+
+    /**
+     * Limpia el timer de extracción.
+     */
+    public void clearExtraction() {
+        this.extractionStartedAt = 0L;
+        this.initiator = null;
+    }
+
+    public long getExtractionStartedAt() {
+        return extractionStartedAt;
+    }
+
+    public UUID getInitiator() {
+        return initiator;
+    }
+
+    /**
+     * Segundos transcurridos desde que comenzó la extracción del punto.
+     */
+    public int getExtractionElapsedSeconds() {
+        if (extractionStartedAt == 0L) return 0;
+        return (int) ((System.currentTimeMillis() - extractionStartedAt) / 1000L);
+    }
+
+    /**
+     * Fracción [0..1] de progreso de extracción.
+     */
+    public double getExtractionProgress(int totalSeconds) {
+        if (extractionStartedAt == 0L || totalSeconds <= 0) return 0.0;
+        double elapsedMs = System.currentTimeMillis() - extractionStartedAt;
+        return Math.max(0.0, Math.min(1.0, elapsedMs / (totalSeconds * 1000.0)));
+    }
+
+    /**
+     * Si el punto está en cooldown y éste ha expirado, lo pasa a IDLE.
+     * @return true si transicionó (acaba de expirar), false en caso contrario.
+     */
+    public boolean tickCooldown() {
+        if (state == State.COOLDOWN && System.currentTimeMillis() >= cooldownUntil) {
+            state = State.IDLE;
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Segundos restantes de cooldown (0 si ya está disponible).
+     */
+    public int getCooldownRemainingSeconds() {
+        if (state != State.COOLDOWN) return 0;
+        long diff = cooldownUntil - System.currentTimeMillis();
+        if (diff <= 0) return 0;
+        return (int) Math.ceil(diff / 1000.0);
     }
 
     /**
@@ -105,7 +193,6 @@ public class ExtractionPoint {
         int beaconY = location.getBlockY();
         int beaconZ = location.getBlockZ();
 
-        // Save and place beacon block
         Location beaconLoc = new Location(world, beaconX, beaconY, beaconZ);
         saveOriginalBlock(beaconLoc);
         world.setType(beaconLoc, Material.BEACON);
@@ -119,22 +206,58 @@ public class ExtractionPoint {
             }
         }
 
+        // Cristal tintado opcional sobre el beacon para colorear el haz
+        Material glass = resolveGlassColor(wcfg.getBeaconGlassColor());
+        if (glass != null) {
+            Location glassLoc = new Location(world, beaconX, beaconY + 1, beaconZ);
+            saveOriginalBlock(glassLoc);
+            world.setType(glassLoc, glass);
+        }
+
         beaconPlaced = true;
     }
 
-    /**
-     * Saves the original block at a location before overwriting it.
-     */
+    private Material resolveGlassColor(String colorName) {
+        if (colorName == null) return null;
+        String c = colorName.trim().toUpperCase();
+        if (c.isEmpty()) return null;
+        try {
+            return Material.valueOf(c + "_STAINED_GLASS");
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
     private void saveOriginalBlock(Location loc) {
-        // Only save if not already saved (avoid overwriting first original)
         if (!originalBlocks.containsKey(loc)) {
             originalBlocks.put(loc.clone(), loc.getBlock().getType());
         }
     }
 
     /**
-     * Removes the beacon and restores original blocks.
+     * Actualiza el cristal tintado sobre el beacon para reflejar el estado del punto.
+     * Se llama en cada transición de estado (IDLE/EXTRACTING/COOLDOWN).
      */
+    public void updateBeaconGlass(WorldConfig wcfg, State state) {
+        if (!beaconPlaced) return;
+        World world = location.getWorld();
+        if (world == null) return;
+
+        String colorName = switch (state) {
+            case EXTRACTING -> wcfg.getBeaconGlassColorExtracting();
+            case COOLDOWN -> wcfg.getBeaconGlassColorCooldown();
+            default -> wcfg.getBeaconGlassColor();
+        };
+
+        Location glassLoc = new Location(world, location.getBlockX(), location.getBlockY() + 1, location.getBlockZ());
+        if (colorName == null || colorName.trim().isEmpty()) {
+            glassLoc.getBlock().setType(Material.AIR);
+        } else {
+            Material glass = resolveGlassColor(colorName);
+            if (glass != null) glassLoc.getBlock().setType(glass);
+        }
+    }
+
     public void removeBeacon(WorldConfig wcfg) {
         if (!beaconPlaced) return;
         if (!wcfg.isBeaconRestoreBlocks()) {
@@ -148,7 +271,6 @@ public class ExtractionPoint {
             return;
         }
 
-        // Restore all original blocks in reverse order (beacon first, then base)
         for (Map.Entry<Location, Material> entry : originalBlocks.entrySet()) {
             Location loc = entry.getKey();
             Material mat = entry.getValue();
@@ -161,50 +283,22 @@ public class ExtractionPoint {
     }
 
     /**
-     * Creates a TextDisplay entity above the beacon showing idle text.
+     * Crea el holograma sobre el beacon a través del HologramService.
      */
-    public void createTextDisplay(WorldConfig wcfg) {
+    public void createHologram(HologramService hologramService, WorldConfig wcfg) {
         if (!wcfg.isDisplayEntityEnabled()) return;
-
-        World world = location.getWorld();
-        if (world == null) return;
-
-        // Remove existing if any
-        removeTextDisplay();
-
-        String idleText = wcfg.getDisplayEntityIdleText();
-        if (idleText == null || idleText.isEmpty()) return;
-
-        Location displayLoc = location.clone().add(0, wcfg.getDisplayEntityHeightAbove(), 0);
-
-        textDisplay = world.spawn(displayLoc, TextDisplay.class, display -> {
-            display.setBillboard(Billboard.CENTER);
-            display.setAlignment(TextAlignment.CENTER);
-            display.setShadowed(true);
-            display.setSeeThrough(wcfg.isDisplayEntitySeeThrough());
-            // Keep default transformation (no scaling changes needed)
-
-            // Parse background color
-            applyBackgroundColor(display, wcfg.getDisplayEntityBackgroundColor());
-
-            // Set text
-            Component text = LegacyComponentSerializer.legacyAmpersand().deserialize(idleText);
-            display.text(text);
-        });
+        Location displayLoc = location.clone().add(0.5, wcfg.getDisplayEntityHeightAbove(), 0.5);
+        hologramService.create(id, displayLoc, buildIdleLines(wcfg));
+        hologramCreated = true;
     }
 
     /**
-     * Updates the TextDisplay with extracting progress text.
-     * @param remainingSeconds seconds remaining
-     * @param totalTime total extraction time
-     * @param wcfg world config
+     * Actualiza el holograma con el progreso de extracción (estado EXTRACTING).
      */
-    public void updateTextDisplay(int remainingSeconds, int totalTime, WorldConfig wcfg) {
-        if (textDisplay == null || textDisplay.isDead()) return;
-        if (!wcfg.isDisplayEntityEnabled()) return;
+    public void updateHologram(HologramService hologramService, int remainingSeconds, int totalTime, WorldConfig wcfg) {
+        if (!hologramCreated || !wcfg.isDisplayEntityEnabled()) return;
 
         double progress = totalTime > 0 ? (double) remainingSeconds / totalTime : 0.0;
-
         String format;
         if (progress > wcfg.getDisplayEntityYellowThreshold()) {
             format = wcfg.getDisplayEntityProgressGreen();
@@ -214,91 +308,106 @@ public class ExtractionPoint {
             format = wcfg.getDisplayEntityProgressRed();
         }
 
-        String text = format.replace("{remaining}", String.valueOf(remainingSeconds));
-        Component component = LegacyComponentSerializer.legacyAmpersand().deserialize(text);
-        textDisplay.text(component);
+        String title = format.replace("{remaining}", String.valueOf(remainingSeconds));
+        String subtitle = nullSafe(wcfg.getDisplayEntitySubtitleExtracting())
+                .replace("{remaining}", String.valueOf(remainingSeconds))
+                .replace("{progress-bar}", buildProgressBar(progress));
+        hologramService.update(id, lines(title, subtitle));
     }
 
     /**
-     * Resets the TextDisplay back to idle text.
+     * Vuelve el holograma al texto idle (o cooldown si toca).
      */
-    public void resetTextDisplay(WorldConfig wcfg) {
-        if (textDisplay == null || textDisplay.isDead()) return;
-        if (!wcfg.isDisplayEntityEnabled()) return;
-
-        String idleText = wcfg.getDisplayEntityIdleText();
-        if (idleText == null || idleText.isEmpty()) {
-            textDisplay.text(Component.empty());
+    public void resetHologram(HologramService hologramService, WorldConfig wcfg) {
+        if (!hologramCreated || !wcfg.isDisplayEntityEnabled()) return;
+        if (getState() == State.COOLDOWN) {
+            hologramService.update(id, buildCooldownLines(wcfg));
         } else {
-            Component component = LegacyComponentSerializer.legacyAmpersand().deserialize(idleText);
-            textDisplay.text(component);
+            hologramService.update(id, buildIdleLines(wcfg));
         }
     }
 
     /**
-     * Removes the TextDisplay entity.
+     * Refresca el holograma según el estado actual del punto.
+     * El task de partículas/cooldown lo invoca periódicamente.
      */
-    public void removeTextDisplay() {
-        if (textDisplay != null) {
-            if (!textDisplay.isDead()) {
-                textDisplay.remove();
-            }
-            textDisplay = null;
+    public void refreshHologramForState(HologramService hologramService, WorldConfig wcfg) {
+        if (!hologramCreated || !wcfg.isDisplayEntityEnabled()) return;
+        switch (getState()) {
+            case IDLE -> hologramService.update(id, buildIdleLines(wcfg));
+            case COOLDOWN -> hologramService.update(id, buildCooldownLines(wcfg));
+            case EXTRACTING -> { /* gestionado por updateHologram en cada tick de extracción */ }
         }
     }
 
+    private List<String> buildIdleLines(WorldConfig wcfg) {
+        return lines(nullSafe(wcfg.getDisplayEntityIdleText()),
+                nullSafe(wcfg.getDisplayEntitySubtitleIdle()));
+    }
+
+    private List<String> buildCooldownLines(WorldConfig wcfg) {
+        int remaining = getCooldownRemainingSeconds();
+        String title = nullSafe(wcfg.getDisplayEntityCooldownText())
+                .replace("{remaining}", String.valueOf(remaining));
+        String subtitle = nullSafe(wcfg.getDisplayEntitySubtitleCooldown())
+                .replace("{remaining}", String.valueOf(remaining));
+        return lines(title, subtitle);
+    }
+
+    private List<String> lines(String... values) {
+        List<String> out = new ArrayList<>();
+        for (String v : values) {
+            if (v != null && !v.isEmpty()) out.add(v);
+        }
+        if (out.isEmpty()) out.add("");
+        return out;
+    }
+
+    private String nullSafe(String s) { return s == null ? "" : s; }
+
     /**
-     * Full cleanup: remove beacon + text display.
+     * Barra de progreso con gradiente de color: verde → amarillo → rojo.
+     * remainingFraction: 1.0 = recién empezado, 0.0 = casi completo.
      */
-    public void cleanup(WorldConfig wcfg) {
+    private String buildProgressBar(double remainingFraction) {
+        int total = 10;
+        int filled = (int) Math.round((1.0 - remainingFraction) * total);
+        filled = Math.max(0, Math.min(total, filled));
+
+        // Color of filled blocks based on how much time remains
+        String filledColor;
+        if (remainingFraction > 0.6) filledColor = "&a";       // green: plenty of time
+        else if (remainingFraction > 0.3) filledColor = "&e";  // yellow: getting urgent
+        else filledColor = "&c";                                // red: nearly done
+
+        StringBuilder sb = new StringBuilder(filledColor);
+        for (int i = 0; i < filled; i++) sb.append("▰");
+        sb.append("&8");
+        for (int i = filled; i < total; i++) sb.append("▱");
+        return sb.toString();
+    }
+
+    /**
+     * Elimina el holograma.
+     */
+    public void removeHologram(HologramService hologramService) {
+        if (!hologramCreated) return;
+        hologramService.remove(id);
+        hologramCreated = false;
+    }
+
+    /**
+     * Cleanup completo: beacon + holograma.
+     */
+    public void cleanup(HologramService hologramService, WorldConfig wcfg) {
         removeBeacon(wcfg);
-        removeTextDisplay();
-    }
-
-    /**
-     * Parses a background color string like "BLACK@0.5" into ARGB color.
-     */
-    private void applyBackgroundColor(TextDisplay display, String colorStr) {
-        if (colorStr == null || colorStr.isEmpty()) return;
-        try {
-            String[] parts = colorStr.split("@");
-            String colorName = parts[0].toUpperCase();
-            int alpha = 255;
-            if (parts.length > 1) {
-                alpha = (int) (Double.parseDouble(parts[1]) * 255);
-            }
-
-            // Map common color names to RGB
-            int rgb = 0;
-            switch (colorName) {
-                case "BLACK" -> rgb = 0x000000;
-                case "WHITE" -> rgb = 0xFFFFFF;
-                case "RED" -> rgb = 0xFF0000;
-                case "GREEN" -> rgb = 0x00FF00;
-                case "BLUE" -> rgb = 0x0000FF;
-                case "YELLOW" -> rgb = 0xFFFF00;
-                case "PURPLE" -> rgb = 0x800080;
-                case "CYAN" -> rgb = 0x00FFFF;
-                case "GRAY", "GREY" -> rgb = 0x808080;
-                default -> {
-                    // Try parsing as hex
-                    if (colorName.startsWith("0x") || colorName.startsWith("#")) {
-                        rgb = Integer.parseInt(colorName.replace("0x", "").replace("#", ""), 16);
-                    }
-                }
-            }
-
-            Color backgroundColor = Color.fromARGB(alpha, (rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
-            display.setBackgroundColor(backgroundColor);
-        } catch (Exception e) {
-            // Ignore color parsing errors
-        }
+        removeHologram(hologramService);
     }
 
     @Override
     public String toString() {
-        return String.format("ExtractionPoint{world=%s, x=%.1f, y=%.1f, z=%.1f, r=%.1f, active=%s}",
-                location.getWorld().getName(),
+        return String.format("ExtractionPoint{id=%s, world=%s, x=%.1f, y=%.1f, z=%.1f, r=%.1f, active=%s}",
+                id, location.getWorld().getName(),
                 location.getX(), location.getY(), location.getZ(),
                 radius, active);
     }

@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
  */
 public class ExtractionTabCompleter implements TabCompleter {
 
-    private static final List<String> SUBCOMMANDS = List.of("reload", "list", "spawn", "remove", "worlds");
+    private static final List<String> SUBCOMMANDS = List.of("reload", "list", "spawn", "remove", "worlds", "info", "tp");
 
     private final ExtractionPoints plugin;
 
@@ -42,11 +42,19 @@ public class ExtractionTabCompleter implements TabCompleter {
 
         if (args.length == 2) {
             String sub = args[0].toLowerCase();
-            if (sub.equals("list") || sub.equals("spawn") || sub.equals("remove")) {
+            if (sub.equals("list") || sub.equals("spawn") || sub.equals("remove") || sub.equals("info")) {
                 String prefix = args[1].toLowerCase();
                 return Bukkit.getWorlds().stream()
                         .map(w -> w.getName())
                         .filter(n -> n.toLowerCase().startsWith(prefix))
+                        .collect(Collectors.toList());
+            }
+            if (sub.equals("tp")) {
+                int count = plugin.getPointManager().getActivePoints().size();
+                List<String> indices = new ArrayList<>();
+                for (int i = 1; i <= count; i++) indices.add(String.valueOf(i));
+                return indices.stream()
+                        .filter(s -> s.startsWith(args[1]))
                         .collect(Collectors.toList());
             }
         }

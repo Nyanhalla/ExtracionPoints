@@ -4,19 +4,25 @@ import com.nyanhalla.extractionpoints.ExtractionPoints;
 import com.nyanhalla.extractionpoints.config.WorldConfig;
 import com.nyanhalla.extractionpoints.managers.PointManager;
 import com.nyanhalla.extractionpoints.models.ExtractionPoint;
+import org.bukkit.Location;
+import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
+import org.bukkit.event.Event;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.block.Action;
+import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerTeleportEvent;
 
-import java.util.UUID;
+import java.util.List;
 
 /**
- * Listener de eventos de jugador: interacción, movimiento, desconexión.
+ * Listener de eventos de jugador: activación por movimiento, desconexión,
+ * teletransporte y protección de bloques del beacon.
  */
 public class PlayerListener implements Listener {
 
@@ -26,78 +32,93 @@ public class PlayerListener implements Listener {
         this.plugin = plugin;
     }
 
-    @EventHandler(priority = EventPriority.NORMAL)
-    public void onPlayerInteract(PlayerInteractEvent event) {
-        Action action = event.getAction();
-        if (action != Action.RIGHT_CLICK_AIR && action != Action.RIGHT_CLICK_BLOCK) {
+    // ──────────────────────────── Activation ────────────────────────────
+
+    @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
+    public void onPlayerMove(PlayerMoveEvent event) {
+        // Skip head-rotation-only events (no block crossing)
+        Location from = event.getFrom();
+        Location to = event.getTo();
+        if (to == null) return;
+        if (from.getBlockX() == to.getBlockX()
+                && from.getBlockY() == to.getBlockY()
+                && from.getBlockZ() == to.getBlockZ()) {
             return;
         }
+        checkAndTriggerExtraction(event.getPlayer());
+    }
 
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onPlayerTeleport(PlayerTeleportEvent event) {
+        // Run 1 tick later so the player's location is already updated
         Player player = event.getPlayer();
+        plugin.getServer().getScheduler().runTaskLater(plugin,
+                () -> checkAndTriggerExtraction(player), 1L);
+    }
+
+    private void checkAndTriggerExtraction(Player player) {
+        if (!player.isOnline()) return;
         String worldName = player.getWorld().getName();
         WorldConfig wcfg = plugin.getConfigManager().getWorldConfig(worldName);
+        if (!wcfg.isEnabled()) return;
 
-        // Check if extraction is enabled in this world
-        if (!wcfg.isEnabled()) {
-            return;
-        }
-
-        // Check permission
         String perm = wcfg.getUsePermission();
-        if (perm != null && !perm.isEmpty() && !player.hasPermission(perm)) {
-            return;
-        }
+        if (perm != null && !perm.isEmpty() && !player.hasPermission(perm)) return;
 
         PointManager pointManager = plugin.getPointManager();
-        UUID uuid = player.getUniqueId();
-
-        // If already extracting, let ExtractionTask handle it
-        if (pointManager.isExtracting(uuid)) {
-            return;
-        }
-
-        // Check cooldown
-        if (wcfg.getPlayerCooldown() > 0) {
-            // Cooldown is checked in startExtraction, but we can early-return here too
-        }
-
-        // Check if player is in an extraction point
         ExtractionPoint point = pointManager.getPointAt(player.getLocation());
-        if (point == null) {
-            return;
-        }
+        if (point == null) return;
+        if (point.getState() != ExtractionPoint.State.IDLE) return;
 
-        // Start extraction
         pointManager.startExtraction(player, point);
     }
 
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void onPlayerMove(PlayerMoveEvent event) {
-        // Only check if position changed significantly (not just head movement)
-        if (event.getFrom().getBlockX() == event.getTo().getBlockX()
-                && event.getFrom().getBlockZ() == event.getTo().getBlockZ()) {
-            return;
-        }
+    // ──────────────────────────── Beacon protection ────────────────────────────
 
-        Player player = event.getPlayer();
-        PointManager pointManager = plugin.getPointManager();
-        UUID uuid = player.getUniqueId();
-
-        if (!pointManager.isExtracting(uuid)) {
-            return;
-        }
-
-        // Check if player is still in the extraction point
-        ExtractionPoint point = pointManager.getExtractionPoint(uuid);
-        if (point == null) return;
-
-        if (!point.isInRange(event.getTo())) {
-            pointManager.cancelExtraction(player);
+    @EventHandler(priority = EventPriority.NORMAL)
+    public void onPlayerInteract(PlayerInteractEvent event) {
+        if (event.getClickedBlock() == null) return;
+        ExtractionPoint protectedPoint = plugin.getPointManager()
+                .getPointByBeaconBlock(event.getClickedBlock().getLocation());
+        if (protectedPoint != null) {
+            event.setUseInteractedBlock(Event.Result.DENY);
         }
     }
 
+    // ──────────────────────────── Disconnect ────────────────────────────
+
     @EventHandler(priority = EventPriority.NORMAL)
     public void onPlayerQuit(PlayerQuitEvent event) {
-        plugin.getPointManager().clearPlayer(event.getPlayer().getUniqueId());
+        Player quitting = event.getPlayer();
+        ExtractionPoint point = plugin.getPointManager().getExtractionPointFor(quitting);
+        if (point == null) return;
+
+        // If this player was the last one inside, cancel immediately
+        List<Player> remaining = plugin.getPointManager().getPlayersInPoint(point);
+        remaining.removeIf(p -> p.equals(quitting));
+        if (remaining.isEmpty()) {
+            plugin.getPointManager().cancelExtraction(point);
+        }
+    }
+
+    // ──────────────────────────── Block protection ────────────────────────────
+
+    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
+    public void onBlockBreak(BlockBreakEvent event) {
+        if (event.getPlayer().isOp()) return;
+        if (plugin.getPointManager().getPointByBeaconBlock(event.getBlock().getLocation()) != null) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
+    public void onBlockPlace(BlockPlaceEvent event) {
+        if (event.getPlayer().isOp()) return;
+        Block placed = event.getBlockPlaced();
+        Block against = event.getBlockAgainst();
+        if (plugin.getPointManager().getPointByBeaconBlock(placed.getLocation()) != null
+                || plugin.getPointManager().getPointByBeaconBlock(against.getLocation()) != null) {
+            event.setCancelled(true);
+        }
     }
 }

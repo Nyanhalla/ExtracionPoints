@@ -15,12 +15,33 @@
     <properties>
         <java.version>21</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <worldedit.version>7.3.10</worldedit.version>
+        <!--
+          Carpeta de plugins del server de pruebas. La copia tras el package
+          es no-fatal: si la ruta no existe (CI, otra máquina), el build sigue.
+          Se puede sobreescribir con -Dtest.server.plugins.dir=/otra/ruta
+          o desactivar copiando con -Dtest.server.plugins.dir=/dev/null
+        -->
+        <test.server.plugins.dir>${project.basedir}/../MinecraftTestDeployment/server/plugins</test.server.plugins.dir>
+        <test.server.container.name>minecraft-server</test.server.container.name>
     </properties>
 
     <repositories>
         <repository>
             <id>papermc</id>
             <url>https://repo.papermc.io/repository/maven-public/</url>
+        </repository>
+        <repository>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
+        </repository>
+        <repository>
+            <id>luckperms</id>
+            <url>https://repo.lucko.me/</url>
+        </repository>
+        <repository>
+            <id>enginehub</id>
+            <url>https://maven.enginehub.org/repo/</url>
         </repository>
     </repositories>
 
@@ -29,6 +50,30 @@
             <groupId>io.papermc.paper</groupId>
             <artifactId>paper-api</artifactId>
             <version>1.21.1-R0.1-SNAPSHOT</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.github.DecentSoftware-eu</groupId>
+            <artifactId>decentholograms</artifactId>
+            <version>2.8.10</version>
+            <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>net.luckperms</groupId>
+            <artifactId>api</artifactId>
+            <version>5.4</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.sk89q.worldedit</groupId>
+            <artifactId>worldedit-bukkit</artifactId>
+            <version>${worldedit.version}</version>
             <scope>provided</scope>
         </dependency>
     </dependencies>
@@ -58,6 +103,41 @@
                         <configuration>
                             <createDependencyReducedPom>false</createDependencyReducedPom>
                             <minimizeJar>true</minimizeJar>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!--
+              Copia el JAR final al server de pruebas tras el shade.
+              Declarado DESPUÉS del shade para que se ejecute con el JAR shadeado.
+              failonerror=false: si la ruta no existe, el build no falla.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>deploy-to-test-server</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <copy file="${project.build.directory}/${project.build.finalName}.jar"
+                                      todir="${test.server.plugins.dir}"
+                                      overwrite="true"
+                                      failonerror="false"
+                                      verbose="true"/>
+                                <!-- Reinicia el contenedor del server de pruebas
+                                     para que cargue el nuevo JAR. failonerror=false
+                                     por si Docker no está corriendo / no es accesible. -->
+                                <exec executable="docker" failonerror="false">
+                                    <arg value="restart"/>
+                                    <arg value="${test.server.container.name}"/>
+                                </exec>
+                            </target>
                         </configuration>
                     </execution>
                 </executions>

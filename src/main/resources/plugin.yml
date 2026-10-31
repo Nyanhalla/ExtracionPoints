@@ -5,7 +5,7 @@ api-version: '1.21'
 prefix: ExtractionPoints
 description: Sistema de puntos de extracción para server PVP con islas skyblock
 authors: [Nyanhalla]
-softdepend: [Multiverse-Core]
+softdepend: [Multiverse-Core, DecentHolograms, LuckPerms, WorldEdit, FastAsyncWorldEdit]
 commands:
   extractionpoints:
     description: Comando admin para puntos de extracción

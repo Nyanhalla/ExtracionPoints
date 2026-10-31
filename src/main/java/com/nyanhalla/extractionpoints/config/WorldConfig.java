@@ -52,6 +52,25 @@ public class WorldConfig {
     private String beaconBaseMaterial;
     private boolean beaconPlaceBeacon;
     private boolean beaconRestoreBlocks;
+    private String beaconGlassColor;
+    private String beaconGlassColorExtracting;
+    private String beaconGlassColorCooldown;
+    private boolean useSchematic;
+    private String schematicName;
+
+    // Lifecycle
+    private boolean respawnOnExtraction;
+    private int pointCooldown;
+
+    // Effects toggles
+    private boolean effectRunes;
+    private boolean effectProgressRing;
+    private boolean effectCharging;
+    private boolean effectDoubleHelix;
+    private String effectCooldownParticle;
+    private String effectChargingParticle;
+    private String effectProgressRingParticle;
+    private String effectRuneParticle;
 
     // Display entity config
     private boolean displayEntityEnabled;
@@ -65,6 +84,10 @@ public class WorldConfig {
     private double displayEntityRedThreshold;
     private String displayEntityBackgroundColor;
     private boolean displayEntitySeeThrough;
+    private String displayEntityCooldownText;
+    private String displayEntitySubtitleIdle;
+    private String displayEntitySubtitleExtracting;
+    private String displayEntitySubtitleCooldown;
 
     // Ambient sound config
     private String ambientSound;
@@ -206,6 +229,55 @@ public class WorldConfig {
     public boolean isBeaconRestoreBlocks() { return beaconRestoreBlocks; }
     public void setBeaconRestoreBlocks(boolean beaconRestoreBlocks) { this.beaconRestoreBlocks = beaconRestoreBlocks; }
 
+    public String getBeaconGlassColor() { return beaconGlassColor; }
+    public void setBeaconGlassColor(String beaconGlassColor) { this.beaconGlassColor = beaconGlassColor; }
+
+    public String getBeaconGlassColorExtracting() { return beaconGlassColorExtracting; }
+    public void setBeaconGlassColorExtracting(String c) { this.beaconGlassColorExtracting = c; }
+
+    public String getBeaconGlassColorCooldown() { return beaconGlassColorCooldown; }
+    public void setBeaconGlassColorCooldown(String c) { this.beaconGlassColorCooldown = c; }
+
+    public boolean isUseSchematic() { return useSchematic; }
+    public void setUseSchematic(boolean useSchematic) { this.useSchematic = useSchematic; }
+
+    public String getSchematicName() { return schematicName; }
+    public void setSchematicName(String schematicName) { this.schematicName = schematicName; }
+
+    // --- Lifecycle ---
+
+    public boolean isRespawnOnExtraction() { return respawnOnExtraction; }
+    public void setRespawnOnExtraction(boolean respawnOnExtraction) { this.respawnOnExtraction = respawnOnExtraction; }
+
+    public int getPointCooldown() { return pointCooldown; }
+    public void setPointCooldown(int pointCooldown) { this.pointCooldown = pointCooldown; }
+
+    // --- Effects toggles ---
+
+    public boolean isEffectRunes() { return effectRunes; }
+    public void setEffectRunes(boolean effectRunes) { this.effectRunes = effectRunes; }
+
+    public boolean isEffectProgressRing() { return effectProgressRing; }
+    public void setEffectProgressRing(boolean effectProgressRing) { this.effectProgressRing = effectProgressRing; }
+
+    public boolean isEffectCharging() { return effectCharging; }
+    public void setEffectCharging(boolean effectCharging) { this.effectCharging = effectCharging; }
+
+    public boolean isEffectDoubleHelix() { return effectDoubleHelix; }
+    public void setEffectDoubleHelix(boolean effectDoubleHelix) { this.effectDoubleHelix = effectDoubleHelix; }
+
+    public String getEffectCooldownParticle() { return effectCooldownParticle; }
+    public void setEffectCooldownParticle(String effectCooldownParticle) { this.effectCooldownParticle = effectCooldownParticle; }
+
+    public String getEffectChargingParticle() { return effectChargingParticle; }
+    public void setEffectChargingParticle(String effectChargingParticle) { this.effectChargingParticle = effectChargingParticle; }
+
+    public String getEffectProgressRingParticle() { return effectProgressRingParticle; }
+    public void setEffectProgressRingParticle(String effectProgressRingParticle) { this.effectProgressRingParticle = effectProgressRingParticle; }
+
+    public String getEffectRuneParticle() { return effectRuneParticle; }
+    public void setEffectRuneParticle(String effectRuneParticle) { this.effectRuneParticle = effectRuneParticle; }
+
     // --- Display Entity getters/setters ---
 
     public boolean isDisplayEntityEnabled() { return displayEntityEnabled; }
@@ -241,6 +313,18 @@ public class WorldConfig {
     public boolean isDisplayEntitySeeThrough() { return displayEntitySeeThrough; }
     public void setDisplayEntitySeeThrough(boolean displayEntitySeeThrough) { this.displayEntitySeeThrough = displayEntitySeeThrough; }
 
+    public String getDisplayEntityCooldownText() { return displayEntityCooldownText; }
+    public void setDisplayEntityCooldownText(String displayEntityCooldownText) { this.displayEntityCooldownText = displayEntityCooldownText; }
+
+    public String getDisplayEntitySubtitleIdle() { return displayEntitySubtitleIdle; }
+    public void setDisplayEntitySubtitleIdle(String s) { this.displayEntitySubtitleIdle = s; }
+
+    public String getDisplayEntitySubtitleExtracting() { return displayEntitySubtitleExtracting; }
+    public void setDisplayEntitySubtitleExtracting(String s) { this.displayEntitySubtitleExtracting = s; }
+
+    public String getDisplayEntitySubtitleCooldown() { return displayEntitySubtitleCooldown; }
+    public void setDisplayEntitySubtitleCooldown(String s) { this.displayEntitySubtitleCooldown = s; }
+
     // --- Ambient sound getters/setters ---
 
     public String getAmbientSound() { return ambientSound; }
@@ -262,15 +346,22 @@ public class WorldConfig {
         private final String command;
         private final boolean asConsole;
         private final long delayTicks;
+        private final boolean bypassPermissions;
 
         public CommandEntry(String command, boolean asConsole, long delayTicks) {
+            this(command, asConsole, delayTicks, false);
+        }
+
+        public CommandEntry(String command, boolean asConsole, long delayTicks, boolean bypassPermissions) {
             this.command = command;
             this.asConsole = asConsole;
             this.delayTicks = delayTicks;
+            this.bypassPermissions = bypassPermissions;
         }
 
         public String getCommand() { return command; }
         public boolean isAsConsole() { return asConsole; }
         public long getDelayTicks() { return delayTicks; }
+        public boolean isBypassPermissions() { return bypassPermissions; }
     }
 }
